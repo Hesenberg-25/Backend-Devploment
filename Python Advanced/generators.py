@@ -8,3 +8,5 @@ def square(nums):
 square_nums=square([1,2,3,4])
 
 print(square_nums)
+
+# Here we are using return to give us result which is a list
