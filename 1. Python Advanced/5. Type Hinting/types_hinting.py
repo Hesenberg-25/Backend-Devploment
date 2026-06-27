@@ -28,7 +28,7 @@ print(user1)
 # But this do not stops us from displaying the Data
 # And also cant point out any Type mismatch from API, Files so we need to use Data-Validation
 
-def create_user(firstname : str, lastname : str, age : int)->dict:
+def create_user1(firstname : str, lastname : str, age : int)->dict:
     email=f"{firstname.lower()}{lastname.lower()}@gmail.com"
 
     return{
@@ -38,8 +38,8 @@ def create_user(firstname : str, lastname : str, age : int)->dict:
         "Age" : age,
     }
 
-user1:dict=create_user("Test","User","eighteen")
-print(user1)
+# user2:dict=create_user2("Test","User","eighteen")
+# print(user2)
 
 # Data Validation :
 # Data Validation work at Runtime for Verification to check that they meet Requirements
@@ -49,7 +49,7 @@ print(user1)
 from pydantic import validate_call
 
 @validate_call
-def create_user(firstname : str, lastname : str, age : int)->dict:
+def create_user2(firstname : str, lastname : str, age : int)->dict:
     email=f"{firstname.lower()}{lastname.lower()}@gmail.com"
 
     return{
@@ -59,5 +59,5 @@ def create_user(firstname : str, lastname : str, age : int)->dict:
         "Age" : age,
     }
 
-user1:dict=create_user("Test","User","eighteen")
-print(user1)
+# user3:dict=create_user3("Test","User","eighteen")
+# print(user3)
