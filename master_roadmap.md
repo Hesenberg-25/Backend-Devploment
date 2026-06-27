@@ -33,6 +33,8 @@
 **Duration:** 1 month
 
 ### Python Advanced
+- [ ] OOP for Python
+- [ ] Decorators
 - [ ] Generators
 - [ ] Context managers
 - [ ] Type hints
