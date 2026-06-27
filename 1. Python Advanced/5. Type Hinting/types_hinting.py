@@ -46,9 +46,9 @@ def create_user1(firstname : str, lastname : str, age : int)->dict:
 # Pydantic help us Validate the Data but there is a catch it will show Error only if you pass "eighteen" as string and not as "18"
 # Because Pydantic can Handle this Error
 
-from pydantic import validate_call
+# from pydantic import validate_call
 
-@validate_call
+# @validate_call
 def create_user2(firstname : str, lastname : str, age : int)->dict:
     email=f"{firstname.lower()}{lastname.lower()}@gmail.com"
 
