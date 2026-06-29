@@ -1,0 +1,125 @@
+{
+    "states": [
+        {
+            "name": "Andhra Pradesh",
+            "initials": "AP",
+            "state_codes": [
+                "V6",
+                "N6C9A",
+                "0M27"
+            ]
+        },
+        {
+            "name": "Arunachal Pradesh",
+            "initials": "AR",
+            "state_codes": [
+                "G79",
+                "TWSQ"
+            ]
+        },
+        {
+            "name": "Assam",
+            "initials": "AS",
+            "state_codes": [
+                "IUY",
+                "F6U2G",
+                "W9R"
+            ]
+        },
+        {
+            "name": "Bihar",
+            "initials": "BR",
+            "state_codes": [
+                "Z3QZ",
+                "3O2V",
+                "H46N",
+                "C7"
+            ]
+        },
+        {
+            "name": "Chhattisgarh",
+            "initials": "CG",
+            "state_codes": [
+                "8R",
+                "P498"
+            ]
+        },
+        {
+            "name": "Goa",
+            "initials": "GA",
+            "state_codes": [
+                "3H",
+                "N8I9N",
+                "Z6"
+            ]
+        },
+        {
+            "name": "Gujarat",
+            "initials": "GJ",
+            "state_codes": [
+                "B6O",
+                "NID45"
+            ]
+        },
+        {
+            "name": "Haryana",
+            "initials": "HR",
+            "state_codes": [
+                "G80K",
+                "X05W",
+                "N9P"
+            ]
+        },
+        {
+            "name": "Himachal Pradesh",
+            "initials": "HP",
+            "state_codes": [
+                "G2N6R",
+                "C107"
+            ]
+        },
+        {
+            "name": "Jharkhand",
+            "initials": "JH",
+            "state_codes": [
+                "4YI83",
+                "P8B6",
+                "9K3C0"
+            ]
+        },
+        {
+            "name": "Karnataka",
+            "initials": "KA",
+            "state_codes": [
+                "2N",
+                "5AOMV",
+                "OQ396"
+            ]
+        },
+        {
+            "name": "Kerala",
+            "initials": "KL",
+            "state_codes": [
+                "IEY97",
+                "Z83C"
+            ]
+        },
+        {
+            "name": "Madhya Pradesh",
+            "initials": "MP",
+            "state_codes": [
+                "J1G6",
+                "Y7U8H"
+            ]
+        },
+        {
+            "name": "Maharashtra",
+            "initials": "MH",
+            "state_codes": [
+                "469N",
+                "A3X",
+                "A1Z"
+            ]
+        }
+    ]
+}
