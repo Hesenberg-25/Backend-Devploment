@@ -61,7 +61,8 @@ operation_handler.setFormatter(operation_formatter)
 # 5. Set the Formatter to the Handler
 
 logger.addHandler(operation_handler)
-# Added the file Handler to the Logger
+# 6. Added the file Handler to the Logger
+
 stream_handler=logging.StreamHandler()
 # => When we want to Display the content which we store in our Log file in our Terminal we could use stream_handler
 stream_handler.setFormatter(operation_formatter)
