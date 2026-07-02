@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Form, HTTPException
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from datetime import date
 import mysql.connector
 from mysql.connector import Error
@@ -9,10 +10,38 @@ from contextlib import contextmanager
 import os
 from dotenv import load_dotenv
 import logging
+from fastapi import status
 
+
+# ═══════════════════════════════════════════════════════════════
+# APP INIT
+# ═══════════════════════════════════════════════════════════════
 app = FastAPI(title="TrueBalance API Backend")
 
-# Enable CORS so your frontend tool can securely connect
+# ═══════════════════════════════════════════════════════════════
+# CUSTOM EXCEPTION
+# ═══════════════════════════════════════════════════════════════
+class TrueBalanceError(Exception):
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        self.message = message
+        super().__init__(self.message)
+
+# ═══════════════════════════════════════════════════════════════
+# 3. EXCEPTION HANDLER
+# ═══════════════════════════════════════════════════════════════
+@app.exception_handler(TrueBalanceError)
+async def truebalance_error_handler(request: Request, exc: TrueBalanceError):
+    trueLogger.warning(f"Business logic error: {exc.message}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message}
+    )
+
+# ═══════════════════════════════════════════════════════════════
+# MIDDLEWARE
+# ═══════════════════════════════════════════════════════════════
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,7 +49,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # ═══════════════════════════════════════════════════════════════
 # CREATING A LOGGER
 # ═══════════════════════════════════════════════════════════════
@@ -57,7 +85,7 @@ def get_db_connection():
         connection = mysql.connector.connect(**DB_CONFIG)
         yield connection
     except Error as e:
-        trueLogger.error(f"Database connection failed : {e}")
+        trueLogger.error(f"Database connection failed: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
     finally:
         if connection and connection.is_connected():
@@ -96,6 +124,7 @@ def init_database():
             trueLogger.info('Database tables initialized successfully')
     except Error as e:
         trueLogger.error(f'Error initializing database: {e}')
+        raise HTTPException(status_code=500, detail='Error initializing database')
 
 # Initialize database on startup
 init_database()
@@ -105,7 +134,7 @@ init_database()
 # ═══════════════════════════════════════════════════════════════
 
 @app.get("/api/health")
-async def health_check():
+async def health_check()->dict:
     """Health check endpoint"""
     trueLogger.info('Status : Ok, TrueBalance API is running')
     return {"status": "ok", "message": "TrueBalance API is running"}
@@ -128,14 +157,14 @@ def get_monthly_expense_logic(month_name: str) -> float:
             return float(result['total']) if result['total'] else 0.0
     except Error as e:
         trueLogger.error(f'Error fetching monthly expenses: {e}')
-        return 0.0
+        raise TrueBalanceError(status_code=500,message=f'Error fetching monthly expenses for month of {month_name} : {e}')
 
-@app.post("/api/expenses")
-async def add_expense_endpoint(category_name: str = Form(...), amount: float = Form(...)):
+@app.post("/api/expenses",status_code=status.HTTP_201_CREATED)
+async def add_expense_endpoint(category_name: str = Form(...), amount: float = Form(...))->dict:
     """Add expense to MySQL database"""
     if category_name not in CATEGORIES:
         trueLogger.warning(f'User entered invalid category {category_name}')
-        raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of {CATEGORIES}")
+        raise TrueBalanceError(status_code=400, message=f"Invalid category. Must be one of {CATEGORIES}")
     
     date_today = date.today()
     month_today = date_today.month
@@ -162,10 +191,10 @@ async def add_expense_endpoint(category_name: str = Form(...), amount: float = F
             }
     except Error as e:
         trueLogger.error(f'Couldnt save the expense due to error {e}')
-        raise HTTPException(status_code=500, detail=f"Error adding expense: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error adding expense: {str(e)}")
 
 @app.get("/api/expenses")
-async def get_all_expenses():
+async def get_all_expenses()->list:
     """Retrieve all expenses from MySQL"""
     try:
         with get_db_connection() as conn:
@@ -181,14 +210,14 @@ async def get_all_expenses():
             return expenses
     except Error as e:
         trueLogger.error(f'Error in fectching expenses {e}')
-        raise HTTPException(status_code=500, detail=f"Error fetching expenses: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error fetching expenses: {str(e)}")
 
 @app.get("/api/expenses/category/{cat_name}")
-async def see_desired_expense_endpoint(cat_name: str):
+async def see_desired_expense_endpoint(cat_name: str)->dict:
     """Get expenses for a specific category from MySQL"""
     if cat_name not in CATEGORIES:
         trueLogger.warning(f'User entered invalid category {cat_name}')
-        raise HTTPException(status_code=400, detail="Category not found")
+        raise TrueBalanceError(status_code=400, message="Category not found")
     
     try:
         with get_db_connection() as conn:
@@ -214,35 +243,34 @@ async def see_desired_expense_endpoint(cat_name: str):
             }
     except Error as e:
         trueLogger.error(f'Error in fectching category wise expenses {e}')
-        raise HTTPException(status_code=500, detail=f"Error fetching category expenses: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error fetching category expenses: {str(e)}")
 
 @app.delete("/api/expenses/{expense_id}")
-async def delete_expense_endpoint(expense_id: int):
+async def delete_expense_endpoint(expense_id: int)->dict:
     """Delete an expense from MySQL"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM expenses WHERE id = %s", (expense_id,))
             conn.commit()
+            row_deleted=cursor.rowcount
             
-            if cursor.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Expense not found")
-            
-            trueLogger.info(f"Expense with ID {expense_id} deleted successfully")
-            return {
-                "status": "success",
-                "message": f"Expense with ID {expense_id} deleted successfully"
-            }
     except Error as e:
         trueLogger.error(f'Error deleting expense {e}')
-        raise HTTPException(status_code=500, detail=f"Error deleting expense: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error deleting expense: {str(e)}")
+
+    if row_deleted == 0:
+        raise TrueBalanceError(status_code=404, message="Expense not found")
+    
+    trueLogger.info(f"Expense with ID {expense_id} deleted successfully")
+    return {"status": "success","message": f"Expense with ID {expense_id} deleted successfully"}
 
 @app.put("/api/expenses/{expense_id}")
-async def update_expense_endpoint(expense_id: int, category_name: str = Form(...), amount: float = Form(...)):
+async def update_expense_endpoint(expense_id: int, category_name: str = Form(...), amount: float = Form(...))->dict:
     """Update an expense in MySQL"""
     if category_name not in CATEGORIES:
         trueLogger.warning(f'User entered invalid category {category_name}')
-        raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of {CATEGORIES}")
+        raise TrueBalanceError(status_code=400, message=f"Invalid category. Must be one of {CATEGORIES}")
     
     try:
         with get_db_connection() as conn:
@@ -252,34 +280,28 @@ async def update_expense_endpoint(expense_id: int, category_name: str = Form(...
                 (category_name, amount, expense_id)
             )
             conn.commit()
+            row_deleted=cursor.rowcount
             
-            if cursor.rowcount == 0:
-                raise HTTPException(status_code=404, detail="Expense not found")
-            
-            return {
-                "status": "success",
-                "message": f"Expense updated successfully",
-                "data": {
-                    "id": expense_id,
-                    "category": category_name,
-                    "amount": amount
-                }
-            }
+    
     except Error as e:
         trueLogger.error(f'Error updating expense {e}')
-        raise HTTPException(status_code=500, detail=f"Error updating expense: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error updating expense: {str(e)}")
 
+    if row_deleted == 0:
+        raise TrueBalanceError(status_code=404, message="Expense not found")
 
+    trueLogger.info(f"Expense {expense_id} updated successfully")
+    return {"status": "success","message": f"Expense updated successfully","data": {"id": expense_id,"category": category_name,"amount": amount}}
 # ═══════════════════════════════════════════════════════════════
 # 2. BUDGET TRACKER MODULE (MySQL Version)
 # ═══════════════════════════════════════════════════════════════
 
-@app.post("/api/budgets")
-async def set_budget_endpoint(month_idx: int = Form(...), budget: float = Form(...)):
+@app.post("/api/budgets",status_code=status.HTTP_201_CREATED)
+async def set_budget_endpoint(month_idx: int = Form(...), budget: float = Form(...))->dict:
     """Set or update budget in MySQL"""
     if month_idx < 1 or month_idx > 12:
         trueLogger.warning('Month not found')
-        raise HTTPException(status_code=400, detail="Month index must be between 1 and 12")
+        raise TrueBalanceError(status_code=400, message="Month index must be between 1 and 12")
     
     month_name = MONTHS[month_idx - 1]
     
@@ -314,10 +336,10 @@ async def set_budget_endpoint(month_idx: int = Form(...), budget: float = Form(.
             }
     except Error as e:
         trueLogger.error(f'Error in setting the budget {e}')
-        raise HTTPException(status_code=500, detail=f"Error setting budget: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error setting budget: {str(e)}")
 
 @app.get("/api/budgets")
-async def get_all_budgets():
+async def get_all_budgets()->list:
     """Get all budgets from MySQL"""
     try:
         with get_db_connection() as conn:
@@ -331,14 +353,14 @@ async def get_all_budgets():
             return budgets
     except Error as e:
         trueLogger.error(f'Error fetching budget {e}')
-        raise HTTPException(status_code=500, detail=f"Error fetching budgets: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error fetching budgets: {str(e)}")
 
 @app.get("/api/budgets/check/{month_name}")
-async def check_budget_endpoint(month_name: str):
+async def check_budget_endpoint(month_name: str)->dict:
     """Check budget vs actual expenses from MySQL"""
     if month_name not in MONTHS:
         trueLogger.warning('Month entered is invalid')
-        raise HTTPException(status_code=400, detail="Invalid month name acronym")
+        raise TrueBalanceError(status_code=400, message="Invalid month name acronym")
     
     try:
         # Get actual expenses
@@ -376,28 +398,52 @@ async def check_budget_endpoint(month_name: str):
         }
     except Error as e:
         trueLogger.error(f'Error fetching budget {e}')
-        raise HTTPException(status_code=500, detail=f"Error checking budget: {str(e)}")
+        raise TrueBalanceError(status_code=500, message=f"Error checking budget: {str(e)}")
 
 
 # ═══════════════════════════════════════════════════════════════
 # 3. INTEREST CALCULATOR MODULE (Pure Math Conversions - No DB needed)
 # ═══════════════════════════════════════════════════════════════
 
-@app.post("/api/calculator/simple-interest")
-async def simple_interest_api(principal: float = Form(...), rate: float = Form(...), years: float = Form(...)):
+@app.post("/api/calculator/simple-interest",status_code=status.HTTP_200_OK)
+async def simple_interest_api(principal: float = Form(...), rate: float = Form(...), years: float = Form(...))->dict:
+    
+    if principal <= 0:
+        raise TrueBalanceError(status_code=400, message="Principal must be positive")
+    if rate <= 0:
+        raise TrueBalanceError(status_code=400, message="Rate must be positive")
+    if years <= 0:
+        raise TrueBalanceError(status_code=400, message="Years must be positive")
+    
     interest = (principal * rate * years) / 100
     trueLogger.info(f"Interest earned : {interest}\nTotal maturity : {principal+interest}")
     return {"interest_earned": interest, "total_maturity_amount": principal + interest}
 
-@app.post("/api/calculator/compound-interest")
-async def compound_interest_api(principal: float = Form(...), rate: float = Form(...), years: float = Form(...), frequency: int = Form(...)):
+@app.post("/api/calculator/compound-interest",status_code=status.HTTP_200_OK)
+async def compound_interest_api(principal: float = Form(...), rate: float = Form(...), years: float = Form(...), frequency: int = Form(...))->dict:
+    
+    if principal <= 0:
+        raise TrueBalanceError(status_code=400, message="Principal must be positive")
+    if rate <= 0:
+        raise TrueBalanceError(status_code=400, message="Rate must be positive")
+    if years <= 0:
+        raise TrueBalanceError(status_code=400, message="Years must be positive")
+    if frequency<=0:
+        raise TrueBalanceError(status_code=400, message="Frequency must be positive")
+    
     rate_fraction = rate / 100
     total_return = principal * pow((1 + (rate_fraction / frequency)), (frequency * years))
     trueLogger.info(f"Interest earned : {total_return-principal}\nTotal maturity : {total_return}")
     return {"interest_earned": total_return - principal, "total_maturity_amount": total_return}
 
-@app.post("/api/calculator/loan-amortization")
-async def loan_amortization_api(principal: float = Form(...), rate: float = Form(...), months_len: int = Form(...)):
+@app.post("/api/calculator/loan-amortization",status_code=status.HTTP_200_OK)
+async def loan_amortization_api(principal: float = Form(...), rate: float = Form(...), months_len: int = Form(...))->dict:
+    
+    if principal <= 0:
+        raise TrueBalanceError(status_code=400, message="Principal must be positive")
+    if rate <= 0:
+        raise TrueBalanceError(status_code=400, message="Rate must be positive")
+    
     monthly_rate = rate / (12 * 100)
     emi = (principal * monthly_rate * pow(1 + monthly_rate, months_len)) / (pow(1 + monthly_rate, months_len) - 1)
     
@@ -425,8 +471,12 @@ async def loan_amortization_api(principal: float = Form(...), rate: float = Form
         "schedule": schedule
     }
 
-@app.post("/api/calculator/taxation")
-async def taxation_api(income: float = Form(...)):
+@app.post("/api/calculator/taxation",status_code=status.HTTP_200_OK)
+async def taxation_api(income: float = Form(...))->dict:
+
+    if income <= 0:
+        raise TrueBalanceError(status_code=400, message="Income must be positive")
+    
     tax = 0
     slabs = []
     if income <= 400000:
@@ -473,8 +523,16 @@ async def taxation_api(income: float = Form(...)):
         "breakdown_slabs": slabs
     }
 
-@app.post("/api/calculator/sip")
-async def sip_api(principal_monthly: float = Form(...), annual_rate: float = Form(...), years: float = Form(...)):
+@app.post("/api/calculator/sip",status_code=status.HTTP_200_OK)
+async def sip_api(principal_monthly: float = Form(...), annual_rate: float = Form(...), years: float = Form(...))->dict:
+    
+    if principal_monthly <= 0:
+        raise TrueBalanceError(status_code=400, message="Monthly Principal must be positive")
+    if annual_rate <= 0:
+        raise TrueBalanceError(status_code=400, message="Annual Rate must be positive")
+    if years <= 0:
+        raise TrueBalanceError(status_code=400, message="Years must be positive")
+    
     compound_frequency = annual_rate / (100 * 12)
     time_frequency = years * 12
     
