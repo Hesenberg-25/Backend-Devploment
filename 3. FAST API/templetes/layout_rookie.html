@@ -1,0 +1,18 @@
+<!-- This the Parent Template we are using to make Common Layout for most of our Pages -->
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+            {% if title %}
+                FastAPI Blog - {{title}}
+            {% else %}
+                FastAPI Blog
+            {% endif %}
+        </title>
+    </head>
+    <body>
+        {% block content %}
+        {% endblock content %}
+    </body>
+</html>

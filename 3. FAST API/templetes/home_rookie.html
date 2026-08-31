@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+<!-- We are extending the layout.html file in this child class -->
+
+<!-- "block content" is the the part which can be OverRideen -->
+{% block content %}
+    {% for post in posted %}
+        <h1>{{post.id}}</h1>
+        <h2>{{post.author}}</h2>
+        <h2>{{post.title}}</h2>
+        <p1>{{post.content}}</p1>
+    {% endfor %}
+{% endblock content %}
